@@ -5,7 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-WorkerService1-1f68803f-6f01-4e0e-96ab-5e7dc8a3f1db</UserSecretsId>
-  </PropertyGroup>
+    <AssemblyName>Dhwarsh</AssemblyName>
+</PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />

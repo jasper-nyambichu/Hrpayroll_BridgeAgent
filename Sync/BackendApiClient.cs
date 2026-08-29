@@ -1,8 +1,9 @@
-﻿using System.Net.Http.Headers;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.ComponentModel;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using WorkerService1.Config;
 
 namespace WorkerService1.Sync;
@@ -32,7 +33,10 @@ public class BackendApiClient
 
     public async Task<SyncResult> SyncEventAsync(SyncEventRequest request, CancellationToken cancellationToken)
     {
-        var response = await _httpClient.PostAsJsonAsync("/attendance/biometric/sync", request, cancellationToken);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new DateTimeNoOffsetConverter());
+
+        var response = await _httpClient.PostAsJsonAsync("/attendance/biometric/sync", request, jsonOptions, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -44,8 +48,7 @@ public class BackendApiClient
             return SyncResult.Failure(body);
         }
 
-        var envelope = JsonSerializer.Deserialize<ApiResponse<JsonElement>>(body,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var envelope = JsonSerializer.Deserialize<ApiResponse<JsonElement>>(body, jsonOptions);
 
         if (envelope is null || !envelope.Success)
         {
@@ -77,4 +80,17 @@ public record SyncResult(bool Succeeded, string? Error)
 {
     public static SyncResult Ok() => new(true, null);
     public static SyncResult Failure(string error) => new(false, error);
+}
+
+// Java's LocalDateTime has no timezone concept and rejects any offset
+// suffix .NET's default DateTime serializer includes (e.g. "+03:00").
+// This formats timestamps as plain "yyyy-MM-ddTHH:mm:ss.fffffff" instead,
+// matching what Jackson's LocalDateTimeDeserializer actually expects.
+public class DateTimeNoOffsetConverter : System.Text.Json.Serialization.JsonConverter<DateTime>
+{
+    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => DateTime.Parse(reader.GetString()!);
+
+    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fffffff"));
 }
