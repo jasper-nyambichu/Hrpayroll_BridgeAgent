@@ -1,36 +1,40 @@
 using WorkerService1.OfflineQueue;
 using WorkerService1.Sync;
 using WorkerService1.Terminal;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace WorkerService1;
 
-// The agent's main loop. On each tick: poll the (mock, for now) terminal for
-// new punches, enqueue them locally, then attempt to sync whatever's
-// pending in the queue to the backend. Terminal reads and backend syncs are
-// deliberately decoupled through the queue — a backend outage never blocks
-// reading new punches off the terminal.
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
     private readonly ITerminalAdapter _terminalAdapter;
     private readonly OfflineQueueStore _queueStore;
+    private readonly AttendanceLogStore _attendanceLog;
     private readonly BackendApiClient _apiClient;
 
     public Worker(
         ILogger<Worker> logger,
         ITerminalAdapter terminalAdapter,
         OfflineQueueStore queueStore,
+        AttendanceLogStore attendanceLog,
         BackendApiClient apiClient)
     {
         _logger = logger;
         _terminalAdapter = terminalAdapter;
         _queueStore = queueStore;
+        _attendanceLog = attendanceLog;
         _apiClient = apiClient;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _queueStore.Initialize();
+
+        _queueStore.Initialize();
+        _attendanceLog.Initialize();
+
         await _terminalAdapter.ConnectAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -55,6 +59,17 @@ public class Worker : BackgroundService
                 Timestamp = evt.Timestamp,
                 VerifyMethod = evt.VerifyMethod,
                 EventType = evt.EventType,
+            });
+
+            // Recorded permanently here — this survives even after the
+            // queue row above gets deleted on successful sync.
+            _attendanceLog.RecordPunch(new AttendanceLogEntry
+            {
+                EventId = evt.EventId,
+                TerminalUserId = evt.TerminalUserId,
+                Timestamp = evt.Timestamp,
+                EventType = evt.EventType,
+                SyncStatus = "Pending",
             });
 
             _logger.LogInformation("Queued event {EventId} ({EventType})", evt.EventId, evt.EventType);
@@ -83,27 +98,25 @@ public class Worker : BackgroundService
                 if (result.Succeeded)
                 {
                     _queueStore.MarkSynced(queued.Id);
+                    _attendanceLog.UpdateStatus(queued.EventId, "Synced");
                     _logger.LogInformation("Synced event {EventId}", queued.EventId);
                 }
                 else
                 {
                     _queueStore.MarkFailedAttempt(queued.Id, result.Error ?? "unknown error");
+                    _attendanceLog.UpdateStatus(queued.EventId, "Failed", result.Error);
                     _logger.LogWarning("Sync failed for {EventId}, will retry: {Error}", queued.EventId, result.Error);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // App is shutting down mid-request — not a real sync failure,
-                // just stop trying and let ExecuteAsync's loop exit cleanly.
                 _logger.LogInformation("Sync loop cancelled due to shutdown.");
                 return;
             }
             catch (Exception ex)
             {
-                // Any other failure (network down, DNS failure, timeout, etc.)
-                // — log it and leave the event queued for the next tick rather
-                // than crashing the whole agent.
                 _queueStore.MarkFailedAttempt(queued.Id, ex.Message);
+                _attendanceLog.UpdateStatus(queued.EventId, "Failed", ex.Message);
                 _logger.LogWarning(ex, "Unexpected error syncing {EventId}, will retry", queued.EventId);
             }
         }

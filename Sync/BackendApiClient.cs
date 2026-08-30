@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using WorkerService1.Config;
+using System.Net.Http;
 
 namespace WorkerService1.Sync;
 

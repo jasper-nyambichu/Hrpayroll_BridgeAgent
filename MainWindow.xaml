@@ -1,0 +1,24 @@
+﻿<Window x:Class="WorkerService1.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="HrPayroll Bridge Agent" Height="500" Width="750">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="HrPayroll Bridge Agent" FontSize="20" FontWeight="Bold" Margin="0,0,0,5"/>
+        <TextBlock Grid.Row="1" x:Name="StatusText" Text="Status: Running — last refreshed --:--:--" FontSize="13" Foreground="Gray" Margin="0,0,0,15"/>
+
+        <DataGrid Grid.Row="2" x:Name="AttendanceGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="150"/>
+                <DataGridTextColumn Header="Terminal User" Binding="{Binding TerminalUserId}" Width="120"/>
+                <DataGridTextColumn Header="Event" Binding="{Binding EventType}" Width="100"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding SyncStatus}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>
