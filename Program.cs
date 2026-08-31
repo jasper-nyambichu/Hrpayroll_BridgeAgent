@@ -1,11 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Windows;
 using WorkerService1;
 using WorkerService1.Config;
 using WorkerService1.OfflineQueue;
 using WorkerService1.Sync;
 using WorkerService1.Terminal;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace WorkerService1;
 
@@ -21,6 +22,8 @@ public class Program
             Args = args,
             ContentRootPath = AppContext.BaseDirectory
         });
+
+        builder.Logging.AddDebug();
 
         builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("Agent"));
         builder.Services.AddSingleton<OfflineQueueStore>();

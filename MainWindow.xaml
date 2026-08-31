@@ -18,6 +18,7 @@
                 <DataGridTextColumn Header="Terminal User" Binding="{Binding TerminalUserId}" Width="120"/>
                 <DataGridTextColumn Header="Event" Binding="{Binding EventType}" Width="100"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding SyncStatus}" Width="100"/>
+                <DataGridTextColumn Header="Error" Binding="{Binding LastError}" Width="300"/>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

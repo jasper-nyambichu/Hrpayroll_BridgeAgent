@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -23,6 +22,13 @@ public class BackendApiClient
     {
         _settings = settings.Value;
         _logger = logger;
+
+        // TEMPORARY DIAGNOSTIC — confirms what values this instance is
+        // actually constructed with at runtime. Remove once the header
+        // bug is found.
+        _logger.LogWarning(
+            "DIAGNOSTIC: BackendBaseUrl={Url} DeviceSerial={Serial} TokenLength={TokenLen}",
+            _settings.BackendBaseUrl, _settings.DeviceSerial, _settings.DeviceToken?.Length ?? 0);
 
         httpClient.BaseAddress = new Uri(_settings.BackendBaseUrl);
         httpClient.DefaultRequestHeaders.Add("X-Device-Serial", _settings.DeviceSerial);

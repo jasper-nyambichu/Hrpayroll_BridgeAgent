@@ -79,34 +79,45 @@ public class AttendanceLogStore
 
     public List<AttendanceLogEntry> GetRecent(int limit = 100)
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
 
-        var command = connection.CreateCommand();
-        command.CommandText = """
+            var command = connection.CreateCommand();
+            command.CommandText = """
             SELECT Id, EventId, TerminalUserId, EmployeeName, Timestamp, EventType, SyncStatus, LastError
             FROM attendance_log
             ORDER BY Timestamp DESC
             LIMIT $limit;
             """;
-        command.Parameters.AddWithValue("$limit", limit);
+            command.Parameters.AddWithValue("$limit", limit);
 
-        var results = new List<AttendanceLogEntry>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            results.Add(new AttendanceLogEntry
+            var results = new List<AttendanceLogEntry>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                Id = reader.GetInt64(0),
-                EventId = reader.GetString(1),
-                TerminalUserId = reader.GetString(2),
-                EmployeeName = reader.IsDBNull(3) ? null : reader.GetString(3),
-                Timestamp = DateTime.Parse(reader.GetString(4)),
-                EventType = reader.GetString(5),
-                SyncStatus = reader.GetString(6),
-                LastError = reader.IsDBNull(7) ? null : reader.GetString(7),
-            });
+                results.Add(new AttendanceLogEntry
+                {
+                    Id = reader.GetInt64(0),
+                    EventId = reader.GetString(1),
+                    TerminalUserId = reader.GetString(2),
+                    EmployeeName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Timestamp = DateTime.Parse(reader.GetString(4)),
+                    EventType = reader.GetString(5),
+                    SyncStatus = reader.GetString(6),
+                    LastError = reader.IsDBNull(7) ? null : reader.GetString(7),
+                });
+            }
+            return results;
         }
-        return results;
+        catch (SqliteException)
+        {
+            // Table doesn't exist yet — the engine hasn't finished Initialize()
+            // on its own thread. The UI will simply show an empty list this
+            // tick and pick up real data on the next refresh once it's ready.
+            return new List<AttendanceLogEntry>();
+        }
     }
+
 }
