@@ -23,16 +23,25 @@ public class BackendApiClient
         _settings = settings.Value;
         _logger = logger;
 
-        // TEMPORARY DIAGNOSTIC — confirms what values this instance is
-        // actually constructed with at runtime. Remove once the header
-        // bug is found.
-        _logger.LogWarning(
-            "DIAGNOSTIC: BackendBaseUrl={Url} DeviceSerial={Serial} TokenLength={TokenLen}",
-            _settings.BackendBaseUrl, _settings.DeviceSerial, _settings.DeviceToken?.Length ?? 0);
+        // Migrate a plaintext token to an encrypted one on first run, so
+        // appsettings.json never has to be hand-edited with an encrypted
+        // blob — you just paste the real token once and it self-protects.
+        string realToken;
+        if (!string.IsNullOrEmpty(_settings.DeviceToken) && !TokenProtector.IsProtected(_settings.DeviceToken))
+        {
+            realToken = _settings.DeviceToken;
+            var encrypted = TokenProtector.Protect(realToken);
+            SettingsFileWriter.UpdateDeviceToken(encrypted);
+            _logger.LogInformation("Device token encrypted at rest for the first time.");
+        }
+        else
+        {
+            realToken = TokenProtector.Unprotect(_settings.DeviceToken ?? string.Empty);
+        }
 
         httpClient.BaseAddress = new Uri(_settings.BackendBaseUrl);
         httpClient.DefaultRequestHeaders.Add("X-Device-Serial", _settings.DeviceSerial);
-        httpClient.DefaultRequestHeaders.Add("X-Device-Token", _settings.DeviceToken);
+        httpClient.DefaultRequestHeaders.Add("X-Device-Token", realToken);
         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
         _httpClient = httpClient;

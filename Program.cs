@@ -36,7 +36,9 @@ public class Program
         AppHost = builder.Build();
         AppHost.Start();
 
-        var app = new Application();
+        WorkerService1.Config.StartupRegistration.EnsureRegistered();
+
+        var app = new System.Windows.Application();
         var mainWindow = AppHost.Services.GetRequiredService<MainWindow>();
         app.Run(mainWindow);
 

@@ -4,6 +4,7 @@
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0-windows</TargetFramework>
         <UseWPF>true</UseWPF>
+        <UseWindowsForms>true</UseWindowsForms>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyName>Dhwarsh</AssemblyName>
@@ -18,7 +19,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="Config\" />
         <Folder Include="OfflineQueue\" />
         <Folder Include="Sync\" />
     </ItemGroup>
