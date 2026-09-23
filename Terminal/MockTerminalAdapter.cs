@@ -50,4 +50,10 @@ public class MockTerminalAdapter : ITerminalAdapter
         _logger.LogInformation("[MOCK] Received {Count} mapping(s) to push to terminal (no-op).", mappings.Count);
         return Task.CompletedTask;
     }
+
+    public Task<bool> EnrollAsync(string terminalUserId, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("[MOCK] Enrollment requested for terminalUserId={TerminalUserId} (no-op).", terminalUserId);
+        return Task.FromResult(true);
+    }
 }

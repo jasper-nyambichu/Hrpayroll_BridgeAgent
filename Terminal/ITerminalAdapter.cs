@@ -18,6 +18,12 @@ public interface ITerminalAdapter
     // the mock and for any future terminal models that support remote
     // enrollment sync.
     Task PushMappingsAsync(IReadOnlyList<TerminalMapping> mappings, CancellationToken cancellationToken);
+
+    // One-time-per-employee: capture a fingerprint and store its template
+    // locally, keyed by terminalUserId, so future PollEventsAsync calls can
+    // identify who just scanned. MockTerminalAdapter no-ops this since it
+    // has no real fingerprint to capture.
+    Task<bool> EnrollAsync(string terminalUserId, CancellationToken cancellationToken);
 }
 
 // One raw punch event read directly off the terminal, before we've resolved
