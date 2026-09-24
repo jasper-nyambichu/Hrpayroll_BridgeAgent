@@ -70,7 +70,7 @@ public class Worker : BackgroundService
             var request = new SyncEventRequest(
                 EventId: queued.EventId,
                 TerminalUserId: queued.TerminalUserId,
-                DeviceSerial: "MOCK-DEVICE-001", // TODO: pull from AgentSettings instead of hardcoding
+                DeviceSerial: "SECUGEN-BRANCH1-003", // TODO: pull from AgentSettings instead of hardcoding
                 Timestamp: queued.Timestamp,
                 VerifyMethod: queued.VerifyMethod,
                 EventType: queued.EventType

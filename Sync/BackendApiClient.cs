@@ -20,7 +20,7 @@ public class BackendApiClient
         _logger = logger;
 
         httpClient.BaseAddress = new Uri(_settings.BackendBaseUrl);
-        httpClient.DefaultRequestHeaders.Add("X-Device-Serial", _settings.DeviceSerial);
+        httpClient.DefaultRequestHeaders.Add("X-Device-Serial", _settings.DeviceSerial.Trim());
         httpClient.DefaultRequestHeaders.Add("X-Device-Token", _settings.DeviceToken);
         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
