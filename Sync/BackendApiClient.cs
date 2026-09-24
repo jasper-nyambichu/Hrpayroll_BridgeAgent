@@ -1,16 +1,13 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WorkerService1.Config;
 
 namespace WorkerService1.Sync;
 
-// Thin typed wrapper around the two device-authenticated endpoints the
-// bridge-agent needs. Mirrors the backend's ApiResponse<T> envelope and
-// DTO shapes exactly — see BiometricSyncController /
-// BiometricSyncRequest / DeviceMappingItemResponse on the backend.
 public class BackendApiClient
 {
     private readonly HttpClient _httpClient;
@@ -58,19 +55,54 @@ public class BackendApiClient
 
         return SyncResult.Ok();
     }
+
+    public async Task<SyncResult> RegisterEnrollmentAsync(long employeeId, string terminalUserId, CancellationToken cancellationToken)
+    {
+        var request = new EnrollmentRequest(employeeId, _settings.DeviceSerial, terminalUserId);
+
+        var response = await _httpClient.PostAsJsonAsync("/attendance/enrollment", request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "Enrollment mapping push failed for employeeId={EmployeeId}: {StatusCode} {Body}",
+                employeeId, response.StatusCode, body);
+
+            return SyncResult.Failure(body);
+        }
+
+        _logger.LogInformation("Enrollment mapping registered on backend for employeeId={EmployeeId}", employeeId);
+        return SyncResult.Ok();
+    }
 }
 
-// Mirrors BiometricSyncRequest on the backend field-for-field.
+public class LocalDateTimeJsonConverter : JsonConverter<DateTime>
+{
+    private const string Format = "yyyy-MM-ddTHH:mm:ss.ffffff";
+
+    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => DateTime.Parse(reader.GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+
+    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.ToString(Format, System.Globalization.CultureInfo.InvariantCulture));
+}
+
 public record SyncEventRequest(
     string EventId,
     string TerminalUserId,
     string DeviceSerial,
-    DateTime Timestamp,
+    [property: JsonConverter(typeof(LocalDateTimeJsonConverter))] DateTime Timestamp,
     string VerifyMethod,
     string EventType
 );
 
-// Mirrors ApiResponse<T> on the backend.
+public record EnrollmentRequest(
+    long EmployeeId,
+    string DeviceSerial,
+    string TerminalUserId
+);
+
 public record ApiResponse<T>(bool Success, string? Message, T? Data, DateTime Timestamp);
 
 public record SyncResult(bool Succeeded, string? Error)

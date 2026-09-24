@@ -30,6 +30,11 @@ public class SecuGenTerminalAdapter : ITerminalAdapter, IDisposable
     private Dictionary<string, byte[]> _templates = new();
     private readonly Dictionary<string, bool> _lastWasClockOut = new();
 
+    // Avoids spamming "Ready — place your finger" every single poll cycle
+    // (PollIntervalSeconds is 1, so that would flood the console). Only
+    // logs the idle message roughly every 10 seconds instead.
+    private int _idleTicks;
+
     public SecuGenTerminalAdapter(ILogger<SecuGenTerminalAdapter> logger)
     {
         _logger = logger;
@@ -75,16 +80,24 @@ public class SecuGenTerminalAdapter : ITerminalAdapter, IDisposable
             throw new InvalidOperationException("Device not connected. Call ConnectAsync first.");
 
         if (_templates.Count == 0)
+        {
+            LogIdleHeartbeat("No employees enrolled yet — nothing to match against.");
             return Task.FromResult<IReadOnlyList<TerminalEvent>>(Array.Empty<TerminalEvent>());
+        }
 
         var template = TryCapture(CaptureTimeoutMs, MinCaptureQuality);
         if (template is null)
+        {
+            LogIdleHeartbeat("Ready — place your finger on the reader to clock in or out.");
             return Task.FromResult<IReadOnlyList<TerminalEvent>>(Array.Empty<TerminalEvent>());
+        }
+
+        _logger.LogInformation("Finger detected — matching...");
 
         var matchedUserId = IdentifyTemplate(template);
         if (matchedUserId is null)
         {
-            _logger.LogInformation("Fingerprint captured but did not match any enrolled employee.");
+            _logger.LogWarning("Fingerprint not recognized. Contact HR to enroll this finger.");
             return Task.FromResult<IReadOnlyList<TerminalEvent>>(Array.Empty<TerminalEvent>());
         }
 
@@ -100,7 +113,8 @@ public class SecuGenTerminalAdapter : ITerminalAdapter, IDisposable
             EventType: eventType
         );
 
-        _logger.LogInformation("Matched fingerprint: {EventType} for terminalUserId={TerminalUserId}", eventType, matchedUserId);
+        _logger.LogInformation("Matched! terminalUserId={TerminalUserId} — {EventType} recorded at {Time:HH:mm:ss}",
+            matchedUserId, eventType, evt.Timestamp.ToLocalTime());
 
         return Task.FromResult<IReadOnlyList<TerminalEvent>>(new List<TerminalEvent> { evt });
     }
@@ -132,6 +146,13 @@ public class SecuGenTerminalAdapter : ITerminalAdapter, IDisposable
         return Task.CompletedTask;
     }
 
+    private void LogIdleHeartbeat(string message)
+    {
+        _idleTicks++;
+        if (_idleTicks % 10 == 1)
+            _logger.LogInformation("{Message}", message);
+    }
+
     private byte[]? TryCapture(int timeoutMs, int minQuality, bool retryUntilTimeout = false)
     {
         if (_fpm is null) return null;
@@ -147,6 +168,15 @@ public class SecuGenTerminalAdapter : ITerminalAdapter, IDisposable
             {
                 var quality = 0;
                 _fpm.GetImageQuality(_imageWidth, _imageHeight, image, ref quality);
+
+                // Quality above a small threshold but below the accept
+                // threshold means a finger IS on the sensor, just not
+                // placed well yet — worth telling the employee that,
+                // rather than staying silent as if nothing happened.
+                if (quality > 0 && quality < minQuality)
+                {
+                    _logger.LogInformation("Finger detected but image quality is low ({Quality}) — press a bit more firmly.", quality);
+                }
 
                 if (quality >= minQuality)
                 {
